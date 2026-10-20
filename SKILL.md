@@ -39,12 +39,13 @@ Installation des Skills allein ist kein Auftrag, Backups einzurichten.
 
 ## Voraussetzungen
 
-- Für Bestandsprüfung: lesender Datei-/Git-Zugriff im vereinbarten Hermes-Home.
+- Für Bestandsprüfung: lesender Datei-/Git-Zugriff im vereinbarten Hermes-Home;
+  für die spätere tägliche Sicherung ein lokales Git-Repository genau dort.
 - Für abgeleitete Skripte: Python 3.10+ mit Standardbibliothek, einschließlich
   `sqlite3`; Linux/macOS. Paketerstellung benötigt keine laufende Datenbank.
 - Verbindlich laden: [Strategie](references/strategie.md),
   [DB-Dumper](references/db-dumper.md), [Credentials](references/credentials.md)
-  und [Hindsight-DB](references/hindsight.md).
+  sowie [Hindsight-DB](references/hindsight.md) und [Git/Cron](references/git-cron.md).
 
 ## Vorgehen — Bestand vor Vorlage
 
@@ -57,11 +58,15 @@ Installation des Skills allein ist kein Auftrag, Backups einzurichten.
    Secrets weder anzeigen noch in Report, Git oder Chat übernehmen. Jeden Fund
    klassifizieren: Git / DB-Dump / Credentials / sonstiger Dateisnapshot /
    regenerierbar / außerhalb des Auftrags. Unsichere Funde offen ausweisen.
-3. **Git-Strategie ableiten.** [Originalvorlage](templates/gitignore.hermes) als
+3. **Täglicher lokaler Git-Commit ist Pflicht.** [Git-Vorlage](templates/gitignore.hermes) als
    Ausgangspunkt für `<HERMES_HOME>/.gitignore` verwenden. Im frischen Ziel nach
    Prüfung kopieren; im bestehenden Ziel Regeln vergleichen und gezielt zusammenführen.
    Individuelle Regeln erhalten. Die Paketvorlage unverändert lassen. Bereits
    getrackte Geheimnisse und zu breit ausgeschlossene wichtige Dateien gesondert prüfen.
+   Im später eingerichteten Cron täglich in diesem Repository committen, auch ohne
+   Änderungen einen datierten Checkpoint erzeugen. Push separat abfragen; bei Ja
+   muss der Benutzer das Remote-Ziel nennen. Schreibzugriff und unbeaufsichtigten
+   Push prüfen, bei fehlendem Zugriff bei der Einrichtung helfen. Details: [Git/Cron](references/git-cron.md).
 4. **Zwei eigene Backupskripte erzeugen.** Aus
    [DB-Vorlage](templates/db_dump.py.example) und
    [Credential-Vorlage](templates/credentials_backup.py.example) selbständige
@@ -79,8 +84,11 @@ Installation des Skills allein ist kein Auftrag, Backups einzurichten.
    `~/backups/hermes/YYYY-MM-DD_HHMMSS_ffffff/`; Mikrosekunden vermeiden Kollisionen.
    DB-Dumps erhalten ihre relativen Quellpfade, Credential-Archive bleiben separat.
    Rechte `0700`/`0600`, Manifest, Integritätskontrollen und eindeutiger
-   Abschlussstatus gehören dazu. Die Jobs haben eigene Laufverzeichnisse,
+   Abschlussstatus gehören dazu. Die Backupschritte haben eigene Laufverzeichnisse,
    keinen behaupteten gemeinsamen Sicherungszeitpunkt.
+   Einen täglichen deterministischen Orchestrator für alle Pflichtschritte erzeugen;
+   Hermes-Cron mit `no_agent=true` und `script` einrichten, ohne LLM, Prompt oder
+   agentenbasierten Fehler-Fallback. Auch Helfer, Git-Hooks und Filter LLM-frei prüfen.
 7. **Entwurf vor Aktivierung abnehmen.** Quellenmatrix, Ausschlüsse, Skripte,
    tatsächliche Zielpfade, Zeitplan, Fehlerzustellung und Wiederherstellung zeigen.
    Bestehende Jobs erhalten; keine doppelte Automation. Aufbewahrungsdauer und
@@ -89,15 +97,21 @@ Installation des Skills allein ist kein Auftrag, Backups einzurichten.
    Zeitzone anzeigen; nicht still übernehmen. Erst bestätigte Werte verwenden.
    Den begrenzten Löschumfang erklären und vor Einbau der Rotation freigeben lassen.
 8. **Nur bei Ausführungsauftrag verifizieren.** Erst dann Backup-Läufe und
-   isolierte Restore-Proben ausführen. Jeden benötigten Fund einem verifizierten
-   Sicherungsweg zuordnen. Fehlende Dateisicherung neben Git/DB/Credentials als
-   Lücke benennen; ein DB-Dump allein ist kein vollständiges Hermes-Backup.
+   isolierte Restore-Proben ausführen. Inventar einschließlich ignorierter Nutzdaten
+   gegen Commit-Baum und tatsächlich erzeugte Archive/Manifeste abgleichen.
+   Zusätzliche benötigte Dateisnapshots verbindlich erzeugen und prüfen, nicht nur
+   vorschlagen. Ungesicherte relevante oder unklassifizierte Daten blockieren die
+   Gesamtabnahme. Neufunde ohne Sicherungsweg müssen auch spätere Läufe als
+   unvollständig melden. Regenerierbarkeit muss begründet sein; Ignore-Regeln
+   allein sind kein Ausschlussgrund. Den tatsächlichen LLM-freien Cron-Lauf und
+   bei gewähltem Push die Übereinstimmung des Remote-Commits separat nachweisen.
 
 ## Ergebnisformat
 
 - Quellenmatrix: relativer Pfad, Zweck/Typ, Sicherungsweg, Aufnahme/Ausschluss mit Grund.
-- Zielangepasste `.gitignore`, DB-Skript, separates Credential-Skript und bei
-  genutztem Hindsight ein topologiespezifischer DB-Backup-Schritt.
+- Zielangepasste `.gitignore`, LLM-freier täglicher Orchestrator mit Pflicht-Commit
+  und optionalem geprüftem Push, DB-Skript, separates Credential-Skript, nötige
+  weitere Dateisnapshots und bei Hindsight ein topologiespezifischer DB-Backup-Schritt.
 - Kurze Befehlsliste für Lauf, Prüfung und isolierten Restore.
 - Klarer Stand: nur vorbereitet / statisch geprüft / tatsächlich ausgeführt /
   Restore geprüft; verbleibende Lücken und Off-Host-Verantwortung.
@@ -109,8 +123,9 @@ Installation des Skills allein ist kein Auftrag, Backups einzurichten.
   konsistenten Snapshot; FTS-Indizes müssen erhalten bleiben.
 - Beispielnamen sind Suchhinweise, keine Zusage über alte oder künftige Hermes-Versionen.
 - Konfigurationsdateien können Credentials enthalten, auch wenn sie nicht `.env` heißen.
-- Ein lokales Backup schützt nicht vor Hostverlust; eine externe Kopie bleibt
-  gesondert zu organisieren. Dieser Skill richtet keinen Remotezugriff ein.
+- Ein lokales Backup schützt nicht vor Hostverlust. Der optionale Git-Push deckt
+  nur Git-Inhalte ab; DBs, Credentials und weitere Snapshots brauchen zusätzlich
+  eine geschützte externe Kopie. Netzwerk-/Tunneländerungen bleiben gesondert freizugeben.
 
 ## Prüfung des Pakets
 

@@ -44,13 +44,15 @@ verpflichtenden Referenzen lesen lassen.
 | Baustein | Ergebnis |
 |---|---|
 | Bestandsprüfung | Konkrete Quellenliste für die eigene Installation, einschließlich alter/zusätzlicher DBs und Credential-Speicher |
-| Git | Original-`.gitignore` als Referenz zum Kopieren/Anpassen nach `.hermes`; vorhandene Regeln und getrackte Altlasten berücksichtigen |
+| Git | Angepasste `.gitignore` als Referenz; täglicher lokaler Commit in `.hermes` ist Pflicht, auch ohne Änderungen als Checkpoint |
+| Optionaler Push | Bei Einrichtung abfragen; bei Ja nennt der Benutzer Remote-Ziel und Branch. Schreibzugriff im Cron-Kontext prüfen und bei fehlendem Zugriff bei der Einrichtung helfen |
 | SQLite | Eigenes abgeleitetes DB-Backupskript, konsistente Snapshots und Integritätsprüfung |
 | Credentials | Eigenes separates Backupskript für `.env`, Auth-/Token-Dateien und sensitive Konfigurationen innerhalb von `.hermes` |
 | Hindsight | Einziger externer Sonderfall: tatsächliche DB/Betriebsart/Zuständigkeit feststellen oder erfragen, dann eigenen Backup-Schritt ableiten |
 | Aufbewahrung und Cron | Ausdrücklich abfragen; Vorschläge **30 Tage** und **täglich 05:00 Uhr morgens in der lokalen Zeitzone** |
+| Ohne LLM | Deterministischer Skriptjob mit `no_agent=true`, einschließlich Git-Commit, optionalem Push und aller Backupschritte; kein Agenten-Fallback |
 | Ablage | `~/backups/hermes/YYYY-MM-DD_HHMMSS_ffffff/`, ein neuer geschützter Ordner je Lauf |
-| Wiederherstellung | Isolierte Restore-Probe bei späterem Ausführungsauftrag; offene Lücken deutlich benennen |
+| Vollständigkeit und Wiederherstellung | Inventar gegen Commit-Baum und echte Archive abgleichen, zusätzliche nötige Dateisnapshots erzeugen und isoliert restoren; keine erfolgreiche Gesamtabnahme mit ungedeckten relevanten Daten |
 
 Externe Projekte, Vaults, SSH-Verzeichnisse und andere externe Dienste gehören
 nicht dazu. Hindsight hat bewusst keine fest vorgegebenen Hosts, Container oder
@@ -60,15 +62,16 @@ DB-Namen. Eine API-Adresse allein genügt nicht zur Bestimmung der Datenbank.
 
 - [SKILL.md](SKILL.md) — Vorgehen und Freigabegrenzen
 - [Strategie](references/strategie.md) — Bestandsprüfung, Git, Ablage und Abnahme
+- [Git und LLM-freier Cron](references/git-cron.md) — Pflicht-Commit, optionaler Push, Zugangseinrichtung und Scheduler-Abnahme
 - [DB-Dumper](references/db-dumper.md) und [Python-Vorlage](templates/db_dump.py.example)
 - [Credentials](references/credentials.md) und [Python-Vorlage](templates/credentials_backup.py.example)
 - [Hindsight-DB-Schritt](references/hindsight.md)
-- [Original-.gitignore](templates/gitignore.hermes) und [Herkunft/Hash](references/template-origin.json)
+- [Gitignore-Vorlage](templates/gitignore.hermes) und [Herkunft/Hash](references/template-origin.json)
 - [Statischer Prüfer](tests/check_static.py)
 
-Die `.gitignore` ist absichtlich bytegleich mit der bereitgestellten
-Originalreferenz, einschließlich historischer Profil-, Repository- und
-Backup-Kommentare. Diese Kommentare sind keine Zielvorgaben und kein Nachweis,
+Die `.gitignore` basiert auf der ursprünglichen Betriebsreferenz und wurde vom
+Benutzer für dieses Paket angepasst. Der aktuelle Vorlagenstand bleibt bei der
+Zielnutzung erhalten. Verbliebene historische Kommentare sind keine Zielvorgaben und kein Nachweis,
 dass eine andere Installation bereits ein NAS-/Off-Host-Backup besitzt.
 Die Vorlage ist keine vollständige Secret-Erkennung; konkrete Credential-Pfade
 müssen bei der späteren Zielprüfung ergänzt werden.
@@ -90,7 +93,11 @@ Hindsight-, Cron- oder Restore-Lauf gehört zur Paketerstellung. Statische Prüf
 ist kein Laufzeitnachweis. Die Vorlagen enthalten keine automatische Löschung;
 Rotation wird erst aus der bestätigten Aufbewahrung und Löschfreigabe abgeleitet.
 Ein DB-Dump plus Credential-Archiv ersetzt nicht die Sicherung weiterer relevanter
-Dateien; der Skill verlangt deren ausdrückliche Zuordnung zu einem Sicherungsweg.
+Dateien; deren tatsächlich erzeugte Sicherung und isolierte Wiederherstellbarkeit
+sind verbindliche Abnahmekriterien. Ungedeckte relevante oder neu gefundene
+unbekannte Daten verhindern die Gesamterfolgsmeldung, auch im späteren Cron.
+Der Git-Verlauf bleibt von der Snapshot-Retention unberührt. Ein optionaler Push
+sichert nur Git-Inhalte, nicht die separat ausgeschlossenen DBs und Credentials.
 
 ## Veröffentlichung
 

@@ -1,5 +1,6 @@
 {
   "template": "templates/gitignore.hermes",
-  "source": "Provided original .hermes/.gitignore; exact copy including historical comments",
-  "sha256": "dd0ad465a7c7052372e9b5c1145faa1cc6d7826bf24844ca6d6383e9a20122a9"
+  "source": "User-adapted package template based on the provided original .hermes/.gitignore",
+  "original_sha256": "dd0ad465a7c7052372e9b5c1145faa1cc6d7826bf24844ca6d6383e9a20122a9",
+  "sha256": "8179b29f86a065e1dc0e647ec54e67de87107042ff3ee4e8656588090d54541d"
 }

@@ -10,17 +10,42 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = {
     'AGENTS.md', 'README.md', 'SKILL.md', 'LICENSE',
-    'references/strategie.md', 'references/db-dumper.md',
+    'references/strategie.md', 'references/db-dumper.md', 'references/git-cron.md',
     'references/template-origin.json', 'templates/gitignore.hermes',
     'templates/db_dump.py.example', 'templates/credentials_backup.py.example',
     'references/credentials.md', 'references/hindsight.md', 'tests/check_static.py',
 }
 
 
+def check_workflow_contract(body, strategy, git_cron):
+    requirements = {
+        'daily commit': (body, 'Täglicher lokaler Git-Commit ist Pflicht'),
+        'no LLM': (body, '`no_agent=true`'),
+        'remote choice': (git_cron, 'Soll das tägliche Git-Backup zusätzlich auf ein Remote gepusht werden?'),
+        'target supplied': (git_cron, 'Benutzer muss die konkrete Remote-URL angeben'),
+        'write verification': (git_cron, 'Ein erfolgreicher `git ls-remote` beweist nur Lesezugriff'),
+        'remote help': (git_cron, 'Bei fehlendem Ziel oder Zugriff bei der Einrichtung helfen'),
+        'unattended verification': (git_cron, 'unter der tatsächlichen Cron-Identität und -Umgebung'),
+        'empty daily checkpoint': (git_cron, '`git commit --allow-empty`'),
+        'coverage gate': (strategy, 'Keine erfolgreiche Gesamtabnahme bei ungesicherten relevanten Daten'),
+        'coverage evidence': (strategy, 'Inventar gegen tatsächlich erzeugte Sicherungsartefakte abgleichen'),
+        'new data gate': (strategy, 'Neue oder unbekannte Dateien ohne Zuordnung blockieren den Gesamterfolg'),
+    }
+    for label, (text, clause) in requirements.items():
+        assert clause in text, f'Missing workflow requirement: {label}'
+    for obsolete in ('Kein blindes `git add -A`, automatischer Commit oder Push.',
+                     'Dieser Skill richtet keinen Remotezugriff ein.'):
+        assert obsolete not in body + strategy + git_cron, f'Contradictory rule: {obsolete}'
+    return requirements
+
+
 def check(root):
-    files = {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}
+    files = {str(p.relative_to(root)) for p in root.rglob('*')
+             if p.is_file() and '.git' not in p.relative_to(root).parts}
     assert REQUIRED <= files, f'Missing package files: {sorted(REQUIRED - files)}'
     for p in root.rglob('*'):
+        if '.git' in p.relative_to(root).parts:
+            continue
         assert not p.is_symlink(), f'Symlink in package: {p}'
     text = (root / 'SKILL.md').read_text()
     assert text.startswith('---\n')
@@ -45,6 +70,18 @@ def check(root):
     ):
         assert phrase in body, f'Missing operative skill clause: {phrase}'
     strategy = (root / 'references/strategie.md').read_text()
+    git_cron = (root / 'references/git-cron.md').read_text()
+    requirements = check_workflow_contract(body, strategy, git_cron)
+    # Text-only negative checks: remove operative clauses, not just headings.
+    for label, (text, clause) in requirements.items():
+        mutated = [part.replace(clause, '', 1) if part == text else part
+                   for part in (body, strategy, git_cron)]
+        try:
+            check_workflow_contract(*mutated)
+        except AssertionError as exc:
+            assert str(exc) == f'Missing workflow requirement: {label}'
+        else:
+            raise AssertionError(f'Undetected removed requirement: {label}')
     for phrase in ('nicht rückwirkend', 'Credentials', 'Off-Host', 'Hindsight',
                    'frischen', 'gewachsenen', 'SQLite format 3', 'Freigabe'):
         assert phrase in strategy, f'Missing strategy clause: {phrase}'
@@ -112,5 +149,6 @@ if __name__ == '__main__':
     except (AssertionError, ValueError, KeyError, ImportError) as exc:
         print(f'FAIL: {exc}', file=sys.stderr)
         sys.exit(1)
-    print(f'PASS: {total} package files; YAML, links, template identity and AST contracts.')
+    print(f'PASS: {total} package files; YAML, links, template identity, AST and workflow contracts.')
+    print('PASS: removed-clause negative checks for each workflow requirement.')
     print('No template imports, backup execution, database reads or runtime acceptance.')

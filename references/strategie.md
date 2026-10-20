@@ -26,7 +26,9 @@ Fehlende Beispiele nicht erzeugen; gefundene unbekannte Dateien nicht still igno
 5. Credential-Kandidaten nach [Credential-Regeln](credentials.md) getrennt aufnehmen.
    Nur Pfade/Typen/Eigentümer/Rechte berichten, keine Werte. Das Einlesen zum später
    freigegebenen Archivieren ist von einer Inhaltsausgabe zu unterscheiden.
-6. Jede relevante Datei bekommt einen Sicherungsweg oder einen begründeten Ausschluss.
+6. Jede relevante Datei bekommt einen verifizierten Sicherungsweg. Nur nachweislich
+   regenerierbare oder ausdrücklich nicht benötigte Inhalte begründet ausschließen;
+   unbekannt oder ignoriert bedeutet nicht entbehrlich.
    Nach Updates/neuen Plugins die Bestandsprüfung wiederholen und Quellenlisten
    neu abnehmen. Ein festes Laufskript entdeckt neue Dateien nicht automatisch.
 
@@ -55,17 +57,17 @@ Plugin-Verzeichnisses bleibt hingegen ein DB-Kandidat.
 
 ## .gitignore nach .hermes kopieren — mit Bestandsprüfung
 
-[templates/gitignore.hermes](../templates/gitignore.hermes) ist eine bytegetreue
-Originalreferenz aus einer gewachsenen Installation, keine universelle fertige
-Zielkonfiguration. Historische Repository-Namen, Profile, NAS-/Backup-Kommentare
-und Ausnahmen bleiben darin absichtlich erhalten; sie begründen weder Zugriff
+[templates/gitignore.hermes](../templates/gitignore.hermes) ist die vom Benutzer
+angepasste Referenz auf Basis einer gewachsenen Installation, keine universelle
+fertige Zielkonfiguration. Verbliebene historische Pfade, Kommentare und Ausnahmen
+begründen weder Zugriff
 noch ein Sicherungsziel bei einem anderen Benutzer.
 
 - Frisch, ohne vorhandene `.gitignore`: Vorlage prüfen, dann bei Einrichtungsauftrag
   nach `<HERMES_HOME>/.gitignore` kopieren und lokale Besonderheiten gezielt anpassen.
 - Bestehend: vorhandene Datei sichern, Diff bilden und Regeln gezielt zusammenführen.
   Eigene Ausnahmen, verschachtelte `.gitignore` und bereits etablierte Ablagen erhalten.
-- Die Originalreferenz im Skill nicht verändern; Änderungen gehören in die Zielkopie.
+- Die aktuelle Paketvorlage bei Zielnutzung nicht verändern; Anpassungen gehören in die Zielkopie.
 - Breite Muster wie `state/`, `sessions/`, `tools/`, `bin/`, `*.db*` und
   `profiles/*/home/` gegen tatsächliche Nutzdaten prüfen. Eigene Skripte/Tools
   dürfen nicht ohne anderen Sicherungsweg verschwinden.
@@ -77,10 +79,12 @@ noch ein Sicherungsziel bei einem anderen Benutzer.
   Git-Historie. `git ls-files` und `git check-ignore --no-index -v -- <relativer-pfad>`
   prüfen. Befunde ohne Inhalte melden. Indexbereinigung, History-Rewrite oder
   Credential-Rotation sind keine automatische Nebenaktion.
-- Lokal versionieren und extern veröffentlichen sind getrennte Entscheidungen.
+- Der tägliche lokale Commit im Hermes-Home ist Pflicht, ein Push ist optional.
+  [Git/Cron](git-cron.md) verbindlich laden: Remote-Wunsch abfragen, bei Ja Ziel
+  vom Benutzer nennen lassen, Schreibzugriff prüfen und bei der Einrichtung helfen.
+  Sicher stagen und täglich committen; keine pauschale Aufnahme sensibler Dateien.
   Ein Hermes-Konfigurationsbackup gehört normalerweise in ein **privates** Ziel;
   das öffentliche Repository dieses Skills enthält nur das Werkzeug, keine Backups.
-  Kein blindes `git add -A`, automatischer Commit oder Push.
 
 ## Ablage und Lebenszyklus
 
@@ -105,23 +109,61 @@ noch ein Sicherungsziel bei einem anderen Benutzer.
   Bestehende Jobs benennen und eine gewünschte Änderung abstimmen, keine Doppeljobs.
   Fehlerzustellung und native Scheduler-Syntax vor Einrichtung prüfen. Die Antwort
   auf die Uhrzeit allein ist keine Freigabe für Löschungen oder Infrastrukturänderungen.
+- Der tägliche Orchestrator läuft als `no_agent=true`-Skriptjob vollständig ohne LLM.
+  Er enthält immer den lokalen Git-Commit, den optional bestätigten Push und alle
+  erforderlichen Sicherungsschritte. Teilerfolge getrennt erfassen; ein Fehler
+  verhindert nicht die unabhängigen anderen Backups, aber die Gesamterfolgsmeldung.
+  Die Snapshot-Retention kürzt weder Git-Historie noch Remote-Branches.
 - **Off-Host:** Gleiches System schützt nicht vor Hostverlust. Benutzer muss eine
-  geschützte externe Kopie organisieren; keine Remote-, Netzwerk- oder Tunneländerung
-  aus diesem Skill ableiten. Zugangsdaten vor Übertragung angemessen verschlüsseln.
+  geschützte externe Kopie der nicht in Git enthaltenen Daten organisieren. Der
+  optionale Git-Push samt Zugangseinrichtung ist Teil dieses Skills, eine zusätzliche
+  Snapshot-Spiegelung oder Netzwerk-/Tunneländerung nicht. Zugangsdaten vor externer
+  Übertragung angemessen verschlüsseln.
+
+## Verbindliche Backupvollständigkeit
+
+**Keine erfolgreiche Gesamtabnahme bei ungesicherten relevanten Daten.**
+
+- Inventar gegen tatsächlich erzeugte Sicherungsartefakte abgleichen: für jede
+  relevante Datei Quellpfad, Sicherungsweg, Commit-ID/Archivmitglied, geprüften
+  Stand und Restore-Nachweis festhalten. Für DBs den konsistenten Snapshot und
+  dessen Manifest zuordnen, nicht Bytegleichheit mit einer weitergeschriebenen DB.
+- Auch ignorierte Dateien, breite Ausschlüsse, neue Plugins und eingebettete
+  Repositories prüfen. Nicht gesicherte Nutzdaten benötigen einen zusätzlich
+  erzeugten geschützten Dateisnapshot; reine Planung oder Nennung reicht nicht.
+  Die zusätzliche Sicherung auf Quellen innerhalb des Hermes-Homes begrenzen.
+- Den Abschlussbericht programmgesteuert gegen die Quellenmatrix abgleichen:
+  keine fehlende relevante Quelle, kein unklassifizierter Fund und kein lediglich
+  geplanter Sicherungsweg. Bewusste Ausschlüsse separat mit konkretem Grund führen;
+  wichtige Daten nicht als „ausgeschlossen“ umetikettieren, um die Prüfung zu bestehen.
+- Neue oder unbekannte Dateien ohne Zuordnung blockieren den Gesamterfolg.
+  Der erzeugte Cron prüft die Inventarzuordnung mit festgelegten Regeln ohne LLM;
+  bei Neufunden bekannte Sicherungen weiter ausführen, aber einen unvollständigen
+  Lauf melden. Aufnahmeregeln erst nach erneuter Bestandsprüfung erweitern.
+- Pro Datei/DB ihren gesicherten Stand dokumentieren. Änderungen nach deren
+  Snapshot separat behandeln; kein global atomarer Zeitpunkt über Git und DBs.
+  Fehlende Rechte, unaufgelöste Links, ungedeckte Hindsight-Abhängigkeiten oder
+  fehlende Restore-Belege bleiben Abnahmeblocker, keine stillen Erfolgsausnahmen.
 
 ## Abnahme bei späterer Nutzung
 
-1. Jeder relevante Fund hat einen Sicherungsweg; bewusste Ausschlüsse sind sichtbar.
+1. Vollständigkeitsabgleich bestanden: jeder relevante Fund ist tatsächlich gesichert
+   und wiederherstellbar, keine unklassifizierten oder ungedeckten Nutzdaten bleiben.
 2. Angepasste `.gitignore` schließt alle ausgewählten DBs/Credentials aus, ohne
    benötigte eigene Dateien unbemerkt zu verlieren. Getrackte Altlasten getrennt melden.
-3. Beide erzeugten Skripte statisch prüfen und erst nach Ausführungsfreigabe starten.
+3. Orchestrator und alle erzeugten Skripte statisch prüfen und erst nach
+   Ausführungsfreigabe starten. Gespeicherten Cron und tatsächlichen Scheduler-Lauf
+   auf LLM-freie Skriptausführung, Zeitplan, neuen lokalen Commit und bei Push-Auswahl
+   identischen Remote-Commit prüfen. Ein Lesezugriff allein genügt dafür nicht.
 4. Manifest, Archiv-/Snapshot-Hashes, SQLite-Integrität und vollständige Dateien prüfen.
 5. Isoliert wiederherstellen; nie als Test über Live-Dateien schreiben. FTS-Funktion,
    wichtige Tabellen und Credential-Dateirechte prüfen, ohne Inhalte auszugeben.
 6. Bei genutztem Hindsight DB-Dump und isolierten DB-Restore gesondert abnehmen;
    fehlende DB-Rechte oder unbekannte Zuständigkeit als offene Sicherungslücke melden.
 7. Credential-Manifest gegen das Archiv/den Restore prüfen, nicht gegen inzwischen
-   erneuerte Live-Tokens. Git-Historie und sonstige Datei-Snapshots separat abnehmen.
+   erneuerte Live-Tokens. Git-Historie und alle erforderlichen zusätzlichen Datei-
+   Snapshots separat durch isolierte Wiederherstellung abnehmen.
 8. Nur tatsächlich belegte Stufen melden. Dieses Paket liefert Vorlagen für DBs und
-   Credentials; Git-Automation und weitere Dateisnapshots sind zielabhängig abzuleiten,
-   kein im Paket bereits laufendes Vollbackup.
+   Credentials; die verpflichtende Git-/Cron-Automation und alle nötigen weiteren
+   Dateisnapshots sind zielabhängig zu erzeugen und vollständig abzunehmen.
+   Der Paketstand selbst ist weiterhin kein bereits laufendes Vollbackup.
