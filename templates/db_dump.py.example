@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""Template: selected SQLite files only; no discovery, scheduler or retention.
+
+Generate a target-specific script and invocation after inventory and approval.
+Do not execute/import this file during package authorship.
+"""
+from __future__ import annotations
+
+import argparse
+from contextlib import closing
+from datetime import datetime
+import gzip
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import sqlite3
+import stat
+import sys
+import time
+
+
+def safe_path(path: Path) -> Path:
+    path = path.expanduser()
+    if not path.is_absolute() or '..' in path.parts:
+        raise ValueError('Absolute path without parent traversal required')
+    if any(p.is_symlink() for p in (path, *path.parents)):
+        raise ValueError('Symlink path rejected')
+    return path
+
+
+def select_sources(home: Path, names: list[str]) -> list[tuple[str, Path]]:
+    if not home.is_dir():
+        raise ValueError('Hermes home missing')
+    sources = []
+    seen = set()
+    for name in names:
+        rel = Path(name)
+        if rel.is_absolute() or '..' in rel.parts or rel == Path('.'):
+            raise ValueError('Only relative source files inside Hermes home')
+        source = safe_path(home / rel)
+        info = source.stat()
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError('Source must be a regular, unlinked file')
+        if info.st_uid != os.getuid():
+            raise ValueError('Source belongs to another user')
+        with source.open('rb') as handle:
+            if handle.read(16) != b'SQLite format 3\x00':
+                raise ValueError('Selected source is not SQLite')
+        identity = (info.st_dev, info.st_ino)
+        if identity in seen:
+            raise ValueError('Duplicate source')
+        seen.add(identity)
+        sources.append((rel.as_posix(), source))
+    if not sources:
+        raise ValueError('Empty source list')
+    return sources
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open('rb') as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def check_sqlite(path: Path) -> int:
+    with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True, timeout=30)) as db:
+        deadline = time.monotonic() + 300
+        db.set_progress_handler(lambda: int(time.monotonic() > deadline), 10000)
+        if db.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
+            raise ValueError('Snapshot integrity failed')
+        return db.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
+
+
+def snapshot(source: Path, destination: Path) -> dict:
+    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    raw = destination.with_name(destination.name + '.snapshot')
+    partial = destination.with_name(destination.name + '.partial')
+    probe = destination.with_name(destination.name + '.restore-check')
+    # Reserve our temporary file exclusively; never reuse a previous snapshot.
+    with raw.open('xb'):
+        pass
+    deadline = time.monotonic() + 300
+
+    def progress(status, remaining, total):
+        if time.monotonic() > deadline:
+            raise TimeoutError('Snapshot time budget exceeded')
+
+    with closing(sqlite3.connect(source.as_uri() + '?mode=ro', uri=True, timeout=30)) as src:
+        with closing(sqlite3.connect(raw)) as dst:
+            src.backup(dst, pages=256, progress=progress, sleep=0.1)
+    tables = check_sqlite(raw)
+    raw_hash = sha256(raw)
+    with raw.open('rb') as handle, gzip.open(partial, 'xb') as compressed:
+        shutil.copyfileobj(handle, compressed)
+    with gzip.open(partial, 'rb') as compressed, probe.open('xb') as restored:
+        shutil.copyfileobj(compressed, restored)
+    if sha256(probe) != raw_hash or check_sqlite(probe) != tables:
+        raise ValueError('Compressed snapshot roundtrip failed')
+    with partial.open('rb') as handle:
+        os.fsync(handle.fileno())
+    partial.rename(destination)
+    result = {'bytes': destination.stat().st_size, 'sha256': sha256(destination),
+              'sqlite_sha256': raw_hash, 'tables': tables}
+    # Only our temporary files from this newly created run are removed.
+    raw.unlink()
+    probe.unlink()
+    return result
+
+
+def write_json(path: Path, value: dict) -> None:
+    with path.open('x', encoding='utf-8') as handle:
+        json.dump(value, handle, indent=2, ensure_ascii=True)
+        handle.write('\n')
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--home', required=True, type=Path)
+    parser.add_argument('--out-base', type=Path, default=Path.home() / 'backups' / 'hermes')
+    parser.add_argument('--db', required=True, action='append', help='Approved relative SQLite path; repeat')
+    args = parser.parse_args()
+    os.umask(0o077)
+    home = safe_path(args.home)
+    base = safe_path(args.out_base)
+    if home == base or base.is_relative_to(home) or home.is_relative_to(base):
+        raise ValueError('Source and output trees must be disjoint')
+    sources = select_sources(home, args.db)
+    base.mkdir(mode=0o700, parents=True, exist_ok=True)
+    info = base.stat()
+    if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+        raise ValueError('Backup root requires own user and mode 0700')
+    now = datetime.now().astimezone()
+    run = base / now.strftime('%Y-%m-%d_%H%M%S_%f')
+    run.mkdir(mode=0o700)  # A collision fails, never overwrites.
+    identity = {'format': 1, 'kind': 'sqlite', 'hermes_home': str(home),
+                'created': now.isoformat(), 'requested': [name for name, _ in sources]}
+    write_json(run / 'INCOMPLETE.json', identity)
+    entries, failures = [], []
+    for name, source in sources:
+        destination = run / 'db' / (name + '.gz')
+        try:
+            result = snapshot(source, destination)
+            entries.append({'source': name, 'file': destination.relative_to(run).as_posix(), **result})
+        except Exception as exc:
+            failures.append({'source': name, 'error_type': type(exc).__name__})
+    write_json(run / 'manifest.json', {**identity, 'entries': entries, 'failures': failures})
+    if failures:
+        print('SQLite backup incomplete; inspect the protected run manifest.', file=sys.stderr)
+        return 1
+    write_json(run / 'COMPLETE.json', {**identity, 'manifest_sha256': sha256(run / 'manifest.json')})
+    (run / 'INCOMPLETE.json').unlink()
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except Exception:
+        # Exception details may contain private paths or SQLite values.
+        print('SQLite backup failed; no complete backup confirmed.', file=sys.stderr)
+        sys.exit(1)

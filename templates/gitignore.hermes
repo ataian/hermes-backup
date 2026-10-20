@@ -1,0 +1,270 @@
+# =============================================================================
+# Hermes settings backup — root .gitignore
+# Nightly backup target: github.com/ataian/mariko_v2 (private)
+# (mariko_v1 is frozen / read-only — never push there again)
+#
+# Design rule: NO databases, NO content-addressed blob stores, NO caches, NO
+# binaries. Every pattern here is repo-wide (applies at any depth), so newly
+# created profiles (profiles/<name>/...) are covered automatically without
+# touching this file or the backup script again.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. DATABASES — never commit, never push (repo-wide, all profiles)
+#    `*.db*` is the catch-all: it covers state.db, state.db-wal, state.db-shm,
+#    state.db-journal, state.db.corrupt-*, state.db.malformed-backup-*,
+#    kanban.db, executions.db, notepad.db, runs_idempotency.db, ...
+# -----------------------------------------------------------------------------
+*.db*
+*.sqlite*
+*.duckdb*
+*.mdb
+*.lmdb
+*.realm
+*.db-journal
+*.db.bak
+*.db~
+*.pgdump
+*.pgdump.*
+*.dump
+*.dump.*
+*.sql.gz
+
+# explicit DB lock/init artefacts
+**/kanban.db.init.lock
+**/*.db.init.lock
+
+# -----------------------------------------------------------------------------
+# 2. BLOB STORES — opaque content-addressed files, never commit
+#    (covers .curator_backups/blobs/** and every per-profile blobs dir)
+# -----------------------------------------------------------------------------
+blobs/
+**/blobs/
+*.blob
+*.blobs
+
+# -----------------------------------------------------------------------------
+# 3. MODEL / MEDIA / BINARY ARTEFACTS — too large, never belong in a git backup
+# -----------------------------------------------------------------------------
+*.safetensors
+*.gguf
+*.ckpt
+*.pth
+*.pt
+*.onnx
+*.h5
+*.pkl
+*.npz
+*.npy
+*.iso
+*.img
+*.qcow2
+*.vmdk
+*.dmg
+*.deb
+*.rpm
+
+# -----------------------------------------------------------------------------
+# 4. Secrets & credentials (nur lokal / NAS-Backup, niemals ins Git)
+# -----------------------------------------------------------------------------
+.env
+.env*
+!.env.example
+auth.json
+auth.json*
+auth-*.json
+auth.lock
+channel_directory.json
+shared/nous_auth.json
+shared/nous_auth.lock
+.copilot_jwt.json
+mcp-tokens/
+webui/.*
+config.yaml.corrupt*
+config.yaml.orig*
+config.yaml.workedbefore
+
+# -----------------------------------------------------------------------------
+# 5. Gateway / runtime state
+# -----------------------------------------------------------------------------
+gateway_state.json
+gateway.pid
+gateway.lock
+.gateway_state_*.tmp
+
+# -----------------------------------------------------------------------------
+# 6. State snapshots (entire directory — huge binary DB copies)
+# -----------------------------------------------------------------------------
+state-snapshots/
+**/state-snapshots/
+state-recovery-*/
+state.db.corrupt-*
+*.corrupt-*
+
+# -----------------------------------------------------------------------------
+# 7. Caches (root + every profile)
+# -----------------------------------------------------------------------------
+cache/
+**/cache/
+audio_cache/
+image_cache/
+**/home/.cache/
+**/.cache/
+__pycache__/
+*.pyc
+.mypy_cache/
+**/.mypy_cache/
+.pytest_cache/
+**/.pytest_cache/
+.ruff_cache/
+**/.ruff_cache/
+models_dev_cache.json
+provider_models_cache.json
+ollama_cloud_models_cache.json
+context_length_cache.yaml
+.skills_prompt_snapshot.json
+skills/.hub/index-cache/
+
+# -----------------------------------------------------------------------------
+# 8. Logs, session history, scratch
+# -----------------------------------------------------------------------------
+logs/
+**/logs/
+sessions/
+sessions.db*
+.hermes_history
+pastes/
+interrupt_debug.log
+DEADJOE
+*.bak
+*~
+profiles/*/config.yaml~
+SOUL.md~
+profiles/*/terminal-sessions/
+
+# -----------------------------------------------------------------------------
+# 9. Cron output & temp files
+# -----------------------------------------------------------------------------
+cron/output/
+**/cron/output/
+# Ephemeral worker handoff files disappear while git add is scanning.
+**/cron/external-workers/
+**/cron/.hb_*.tmp
+**/cron/.jobs_*.tmp
+*.tmp
+**/*.tmp
+**/*.lock
+
+# -----------------------------------------------------------------------------
+# 10. Sandboxes, workspaces, embedded git repos
+# -----------------------------------------------------------------------------
+sandboxes/
+profiles/scotty/home/
+plugins/superpowers/
+profiles/*/plugins/superpowers/
+
+# -----------------------------------------------------------------------------
+# 11. Hermes source code (separate project)
+# -----------------------------------------------------------------------------
+hermes-agent/
+
+# -----------------------------------------------------------------------------
+# 12. Install metadata & generated tooling
+# -----------------------------------------------------------------------------
+.install_method
+.update_check
+**/.install-*/
+# installs/ = Package-Manager-Runtime: uv-venvs, generierte environments,
+# Workspace-Checkouts des hermes-agent-Quellcodes, pm-runtime/inputs.
+# Vollstaendig regenerierbar (Hermes-Installer), 1,1 GB auf der Platte und
+# woechentlich neuer Churn (2342 Deletes/2 Mods offen) — gehoert nicht ins Backup.
+/installs/
+node/
+bin/
+tools/
+profiles/*/bin/
+lsp/node_modules/
+lsp/bin/docker-langserver
+profiles/*/lsp/node_modules/
+profiles/*/home/.npm/
+profiles/*/home/.npm-global/
+node_modules/
+**/node_modules/
+
+# -----------------------------------------------------------------------------
+# 14. Dead plugin data (hermes-achievements: no plugin code left, nothing reads
+#     scan_*.json / state.json — was 33 MB of orphaned data in the backup)
+# -----------------------------------------------------------------------------
+plugin-data/hermes-achievements/
+plugins/hermes-achievements/
+plugin-data/*/scan_*.json
+plugins/*/scan_*.json
+
+# -----------------------------------------------------------------------------
+# 15. Kategorien, die ein frisches Hermes NICHT braucht (regenerierbar,
+#     cache-/session-artig, oder im taeglichen NAS-Backup /backup/joi/hermes
+#     enthalten). Regel: ins GitHub-Backup gehoert nur, was ein frisches Hermes
+#     nicht von allein bekommt -> skills, memories, plans, profiles, scripts,
+#     cron-jobs, configs.
+# -----------------------------------------------------------------------------
+state-snapshots/
+**/state-snapshots/
+/refs/
+/secrets/
+/pets/
+/pastes/
+/images/
+/backups/
+/attachments/
+.curator_backups/
+**/.curator_backups/
+lsp/
+**/lsp/
+
+# -----------------------------------------------------------------------------
+# 16. Backup config files
+# -----------------------------------------------------------------------------
+config.yaml.bak.*
+
+# -----------------------------------------------------------------------------
+# 17. Nachtrag 2026-09-16 — Muster aus der alten .gitignore, die oben fehlten,
+#     plus Lücken aus der Bestandsanalyse (8886 getrackte Dateien / 297 MB
+#     → 3212 Dateien / 28 MB nach diesen Regeln).
+# -----------------------------------------------------------------------------
+# 17a) aus der alten .gitignore nachgezogen (sonst wieder im Backup)
+gateway.*
+gateway-starts.log
+cron/ticker_*
+tui-theme-boot.json
+web-ui-build-stamp.json
+shared/
+*.pid
+*.orig
+*.bak.*
+
+# 17b) Lücken, die weder alt noch neu abdeckten (alle Runtime/State/Cache)
+state/
+desktop/
+terminal-sessions/
+tmp/
+runtime/
+models_dev_cache.etag
+processes.json
+spawn-ledger.json
+*.state
+*.bak-*
+recovered.sql
+.gitignore_old
+profiles/*/home/
+
+# -----------------------------------------------------------------------------
+# 18. Ausnahme: Skill-Curator-Snapshots (skills/.curator_backups/<ts>/ mit
+#     manifest.json, cron-jobs.json, skills.tar.gz) sind self-contained und
+#     sollen im Git-Backup bleiben. Der content-addressed Blob-Store
+#     .curator_backups/blobs/ (198 SHA-Dateien ohne Index) bleibt draußen —
+#     ohne Index nicht rekonstruierbar.
+#     DBs bleiben generell draußen (eigenes Verfahren: scripts/db-dump-backup.sh
+#     → /backups/dbdumps/); damit fällt auch backups/confluence-skill/ weg.
+# -----------------------------------------------------------------------------
+!skills/.curator_backups/
+!skills/.curator_backups/**
