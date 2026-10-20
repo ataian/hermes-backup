@@ -67,6 +67,10 @@ Installation des Skills allein ist kein Auftrag, Backups einzurichten.
    Änderungen einen datierten Checkpoint erzeugen. Push separat abfragen; bei Ja
    muss der Benutzer das Remote-Ziel nennen. Schreibzugriff und unbeaufsichtigten
    Push prüfen, bei fehlendem Zugriff bei der Einrichtung helfen. Details: [Git/Cron](references/git-cron.md).
+   Für Git-Inhalte genügt der tägliche Commit mit optionalem Push.
+   Keine zusätzliche Sicherung von `.git` oder Git-Inhalten als Bundle, Kopie oder
+   Archiv einrichten. Separate Dumps/Backups decken nur relevante Daten außerhalb
+   dieses Git-Sicherungswegs ab.
 4. **Zwei eigene Backupskripte erzeugen.** Aus
    [DB-Vorlage](templates/db_dump.py.example) und
    [Credential-Vorlage](templates/credentials_backup.py.example) selbständige

@@ -36,11 +36,12 @@ Fehlende Beispiele nicht erzeugen; gefundene unbekannte Dateien nicht still igno
 
 | Gefundener Inhalt | Sicherungsweg |
 |---|---|
-| SOUL, Agentenregeln, eigene Skills/Referenzen, Skripte, Memories, Pläne | Lokales Git und geschützter Dateisnapshot/Git-Repository-Backup |
+| SOUL, Agentenregeln, eigene Skills/Referenzen, Skripte, Memories, Pläne | Täglicher lokaler Git-Commit, optionaler Push |
 | Konfigurationen, Profildefinitionen, Cron-Definitionen | Git nur nach Secret-Prüfung; sonst geschützter Dateisnapshot/Credentials |
 | SQLite: etwa `state.db`, Projekt-/Board-DBs, `cron/*.db`, Plugin-DBs | Konsistenter DB-Dump, nicht Git und nicht rohe Dateikopie |
 | `.env`, Auth-/Token-Dateien, sensitive Plugin-Konfiguration | Eigenes Credential-Skript, niemals Git |
 | Benötigte Sessions, Anhänge oder sonstige Nutzdaten, die Git ausschließt | Separater geschützter Dateisnapshot innerhalb des vereinbarten Quellbaums |
+| `.git`-Metadaten | Bestandteil des Git-Sicherungswegs; keine zusätzliche Sicherung und keine Abdeckungslücke |
 | Installationen, Cache, Logs, PID-/Lock-Dateien | Nur bei begründetem Wiederherstellungsbedarf; sonst regenerierbar |
 | Zugehörige Hindsight-Datenbank, gegebenenfalls extern | Eigener, an die tatsächliche Betriebsart angepasster DB-Backup-Schritt |
 | Andere Daten außerhalb des Hermes-Homes | Außerhalb dieses Skills, keine Aufnahme |
@@ -124,6 +125,10 @@ noch ein Sicherungsziel bei einem anderen Benutzer.
 
 **Keine erfolgreiche Gesamtabnahme bei ungesicherten relevanten Daten.**
 
+- Ein verifizierter Commit deckt die darin enthaltenen Dateien ab; ein zusätzliches Backup ist dafür nicht erforderlich.
+  Separate Dumps/Backups sind für relevante Daten außerhalb dieses Git-Sicherungswegs
+  vorgesehen. `.git` selbst bleibt von Dateisnapshots und der Suche nach ungedeckten
+  Nutzdaten ausgeschlossen; fehlende Git-Bundles oder `.git`-Kopien sind keine Abnahmelücke.
 - Inventar gegen tatsächlich erzeugte Sicherungsartefakte abgleichen: für jede
   relevante Datei Quellpfad, Sicherungsweg, Commit-ID/Archivmitglied, geprüften
   Stand und Restore-Nachweis festhalten. Für DBs den konsistenten Snapshot und
@@ -161,8 +166,9 @@ noch ein Sicherungsziel bei einem anderen Benutzer.
 6. Bei genutztem Hindsight DB-Dump und isolierten DB-Restore gesondert abnehmen;
    fehlende DB-Rechte oder unbekannte Zuständigkeit als offene Sicherungslücke melden.
 7. Credential-Manifest gegen das Archiv/den Restore prüfen, nicht gegen inzwischen
-   erneuerte Live-Tokens. Git-Historie und alle erforderlichen zusätzlichen Datei-
-   Snapshots separat durch isolierte Wiederherstellung abnehmen.
+   erneuerte Live-Tokens. Git-Dateien direkt aus dem vorhandenen Commit in ein
+   isoliertes Ziel wiederherstellen; dafür kein Repository-Backup erzeugen.
+   Erforderliche Dateisnapshots der nicht durch Git gesicherten Daten separat restoren.
 8. Nur tatsächlich belegte Stufen melden. Dieses Paket liefert Vorlagen für DBs und
    Credentials; die verpflichtende Git-/Cron-Automation und alle nötigen weiteren
    Dateisnapshots sind zielabhängig zu erzeugen und vollständig abzunehmen.

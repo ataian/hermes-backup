@@ -54,6 +54,10 @@ verpflichtenden Referenzen lesen lassen.
 | Ablage | `~/backups/hermes/YYYY-MM-DD_HHMMSS_ffffff/`, ein neuer geschützter Ordner je Lauf |
 | Vollständigkeit und Wiederherstellung | Inventar gegen Commit-Baum und echte Archive abgleichen, zusätzliche nötige Dateisnapshots erzeugen und isoliert restoren; keine erfolgreiche Gesamtabnahme mit ungedeckten relevanten Daten |
 
+Für Git-Inhalte genügt der tägliche Commit mit optionalem Push. Es gibt keine
+zusätzliche `.git`-Sicherung, kein Git-Bundle und kein zweites Archiv dieser Inhalte.
+Separate Dumps und Backups sichern ausschließlich relevante Daten, die Git nicht abdeckt.
+
 Externe Projekte, Vaults, SSH-Verzeichnisse und andere externe Dienste gehören
 nicht dazu. Hindsight hat bewusst keine fest vorgegebenen Hosts, Container oder
 DB-Namen. Eine API-Adresse allein genügt nicht zur Bestimmung der Datenbank.

@@ -24,6 +24,9 @@ committen, pushen oder als Backup ausführen.
 
 ## Vertrag des täglichen Git-Schritts
 
+- Der Git-Sicherungsweg besteht aus lokalem Commit und optionalem Push.
+  Keine Git-Bundles, `.git`-Kopien oder zusätzlichen Archive der Git-Inhalte erzeugen.
+  Separate Dumps/Backups sichern nur relevante Daten, die dieser Git-Weg nicht abdeckt.
 - Immer im bestätigten Hermes-Repository arbeiten. Überlappende Backup-Läufe mit
   einer eigenen Sperre verhindern. Vorhandene Merge-/Rebase-Konflikte, ein unerwarteter
   Branch oder fremde vorgemerkte Änderungen sind Fehler; Index/Arbeitsbaum nicht mit

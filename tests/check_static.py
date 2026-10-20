@@ -27,6 +27,9 @@ def check_workflow_contract(body, strategy, git_cron):
         'remote help': (git_cron, 'Bei fehlendem Ziel oder Zugriff bei der Einrichtung helfen'),
         'unattended verification': (git_cron, 'unter der tatsächlichen Cron-Identität und -Umgebung'),
         'empty daily checkpoint': (git_cron, '`git commit --allow-empty`'),
+        'git-only backup boundary': (body, 'Für Git-Inhalte genügt der tägliche Commit mit optionalem Push.'),
+        'no repository duplicate': (git_cron, 'Keine Git-Bundles, `.git`-Kopien oder zusätzlichen Archive der Git-Inhalte erzeugen.'),
+        'git coverage boundary': (strategy, 'Ein verifizierter Commit deckt die darin enthaltenen Dateien ab; ein zusätzliches Backup ist dafür nicht erforderlich.'),
         'coverage gate': (strategy, 'Keine erfolgreiche Gesamtabnahme bei ungesicherten relevanten Daten'),
         'coverage evidence': (strategy, 'Inventar gegen tatsächlich erzeugte Sicherungsartefakte abgleichen'),
         'new data gate': (strategy, 'Neue oder unbekannte Dateien ohne Zuordnung blockieren den Gesamterfolg'),
@@ -34,7 +37,8 @@ def check_workflow_contract(body, strategy, git_cron):
     for label, (text, clause) in requirements.items():
         assert clause in text, f'Missing workflow requirement: {label}'
     for obsolete in ('Kein blindes `git add -A`, automatischer Commit oder Push.',
-                     'Dieser Skill richtet keinen Remotezugriff ein.'):
+                     'Dieser Skill richtet keinen Remotezugriff ein.',
+                     'Lokales Git und geschützter Dateisnapshot/Git-Repository-Backup'):
         assert obsolete not in body + strategy + git_cron, f'Contradictory rule: {obsolete}'
     return requirements
 
