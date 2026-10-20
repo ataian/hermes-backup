@@ -1,7 +1,5 @@
 # =============================================================================
 # Hermes settings backup — root .gitignore
-# Nightly backup target: github.com/ataian/mariko_v2 (private)
-# (mariko_v1 is frozen / read-only — never push there again)
 #
 # Design rule: NO databases, NO content-addressed blob stores, NO caches, NO
 # binaries. Every pattern here is repo-wide (applies at any depth), so newly
@@ -135,11 +133,9 @@ sessions.db*
 .hermes_history
 pastes/
 interrupt_debug.log
-DEADJOE
 *.bak
 *~
 profiles/*/config.yaml~
-SOUL.md~
 profiles/*/terminal-sessions/
 
 # -----------------------------------------------------------------------------
@@ -159,7 +155,7 @@ cron/output/
 # 10. Sandboxes, workspaces, embedded git repos
 # -----------------------------------------------------------------------------
 sandboxes/
-profiles/scotty/home/
+profiles/*/home/
 plugins/superpowers/
 profiles/*/plugins/superpowers/
 
@@ -201,11 +197,7 @@ plugin-data/*/scan_*.json
 plugins/*/scan_*.json
 
 # -----------------------------------------------------------------------------
-# 15. Kategorien, die ein frisches Hermes NICHT braucht (regenerierbar,
-#     cache-/session-artig, oder im taeglichen NAS-Backup /backup/joi/hermes
-#     enthalten). Regel: ins GitHub-Backup gehoert nur, was ein frisches Hermes
-#     nicht von allein bekommt -> skills, memories, plans, profiles, scripts,
-#     cron-jobs, configs.
+# 15. regenerierbar, cache-/session-artig
 # -----------------------------------------------------------------------------
 state-snapshots/
 **/state-snapshots/
@@ -226,12 +218,7 @@ lsp/
 # -----------------------------------------------------------------------------
 config.yaml.bak.*
 
-# -----------------------------------------------------------------------------
-# 17. Nachtrag 2026-09-16 — Muster aus der alten .gitignore, die oben fehlten,
-#     plus Lücken aus der Bestandsanalyse (8886 getrackte Dateien / 297 MB
-#     → 3212 Dateien / 28 MB nach diesen Regeln).
-# -----------------------------------------------------------------------------
-# 17a) aus der alten .gitignore nachgezogen (sonst wieder im Backup)
+# 17a) fehlende Dinge
 gateway.*
 gateway-starts.log
 cron/ticker_*
